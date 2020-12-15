@@ -7,19 +7,92 @@ output:
 
 
 ## Loading and preprocessing the data
+# Unzipping the file and reading it
+path = getwd()
+unzip("repdata_data_activity.zip", exdir = path)
+activity <- read.csv("activity.csv")
+str(activity)
 
-
+# importing libraries
+library(ggplot2)
+library(dplyr)
 
 ## What is mean total number of steps taken per day?
+# create and print number of steps per day
+StepsPerDay <- aggregate(activity$steps, list(activity$date), FUN=sum)
+colnames(StepsPerDay) <- c("Date", "Steps")
+StepsPerDay
 
+# producing a histogram using ggplot
+g <- ggplot(StepsPerDay, aes(Steps))
+g+geom_histogram(boundary=0, binwidth=2500, col="darkgreen", fill="lightgreen")+ggtitle("Histogram of steps per day")+xlab("Steps")+ylab("Frequency")+theme(plot.title = element_text(face="bold", size=12))+scale_x_continuous(breaks=seq(0,25000,2500))+scale_y_continuous(breaks=seq(0,18,2))
 
+# Mean
+mean(StepsPerDay$Steps, na.rm=TRUE)
+#Median
+median(StepsPerDay$Steps, na.rm=TRUE)
 
 ## What is the average daily activity pattern?
 
-
+# produce a table showing steps per time
+StepsPerTime <- aggregate(steps~interval,data=activity,FUN=mean,na.action=na.omit)
+# show variable time 
+StepsPerTime$time <- StepsPerTime$interval/100
+# producing a line plot
+h <- ggplot(StepsPerTime, aes(time, steps))
+h+geom_line(col="brown")+ggtitle("Average steps per time interval")+xlab("Time")+ylab("Steps")+theme(plot.title = element_text(face="bold", size=12))
 
 ## Imputing missing values
+# create the dplyr table
+ST <- tbl_df(StepsPerTime)
+# locate column
+ST %>% select(time, steps) %>% filter(steps==max(ST$steps))
 
+# create the dplyr table
+ACT <- tbl_df(activity)
+# locate column
+ACT %>% filter(is.na(steps)) %>% summarize(missing_values = n())
+
+#  imput none-NA values in a new column
+activity$CompleteSteps <- ifelse(is.na(activity$steps), round(StepsPerTime$steps[match(activity$interval, StepsPerTime$interval)],0), activity$steps)
+
+# produce new dataset activityFull
+activityFull <- data.frame(steps=activity$CompleteSteps, interval=activity$interval, date=activity$date)
+# show the first ten values of the produced new dataset
+head(activityFull, n=10)
+
+
+# data preparaion
+StepsPerDayFull <- aggregate(activityFull$steps, list(activityFull$date), FUN=sum)
+colnames(StepsPerDayFull) <- c("Date", "Steps")
+# produce a histogram
+g <- ggplot(StepsPerDayFull, aes(Steps))
+g+geom_histogram(boundary=0, binwidth=2500, col="darkblue", fill="lightblue")+ggtitle("Histogram of steps per day")+xlab("Steps")+ylab("Frequency")+theme(plot.title = element_text(face="bold", size=12))+scale_x_continuous(breaks=seq(0,25000,2500))+scale_y_continuous(breaks=seq(0,26,2))
+
+
+# show Mean
+mean(StepsPerDayFull$Steps)
+
+# show Median
+median(StepsPerDayFull$Steps)
 
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+# Create a correct format of a date variable 
+activityFull$RealDate <- as.Date(activityFull$date, format = "%Y-%m-%d")
+# create a variable name weekdays 
+activityFull$weekday <- weekdays(activityFull$RealDate)
+# create another variable name weekday or weekend
+activityFull$DayType <- ifelse(activityFull$weekday=='Saturday' | activityFull$weekday=='Sunday', 'weekend','weekday')
+# display the first 10 values
+head(activityFull, n=10)
+
+
+# create table with steps per time across weekdaydays or weekend days
+StepsPerTimeDT <- aggregate(steps~interval+DayType,data=activityFull,FUN=mean,na.action=na.omit)
+# variable time 
+StepsPerTimeDT$time <- StepsPerTime$interval/100
+# produce a line plot
+j <- ggplot(StepsPerTimeDT, aes(time, steps))
+j+geom_line(col="darkred")+ggtitle("Average steps per time interval: weekdays vs. weekends")+xlab("Time")+ylab("Steps")+theme(plot.title = element_text(face="bold", size=12))+facet_grid(DayType ~ .)
